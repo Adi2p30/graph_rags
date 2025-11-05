@@ -44,6 +44,39 @@ class GraphStore:
         )
         self.metadata["entity_count"] = self.graph.number_of_nodes()
 
+    def get_entity_text(self, entity_id: str) -> str:
+        """
+        Generate text description for entity (for embedding)
+
+        Args:
+            entity_id: Entity identifier
+
+        Returns:
+            Text description
+        """
+        if entity_id not in self.graph:
+            return ""
+
+        entity_data = dict(self.graph.nodes[entity_id])
+        entity_type = entity_data.get('entity_type', 'ENTITY')
+
+        # Build text representation
+        parts = [f"{entity_id.replace('_', ' ')} is a {entity_type}"]
+
+        # Add description if available
+        if 'description' in entity_data:
+            parts.append(entity_data['description'])
+        elif 'name' in entity_data:
+            parts.append(f"named {entity_data['name']}")
+
+        # Add other properties
+        for key, value in entity_data.items():
+            if key not in ['entity_type', 'description', 'name', 'source_document']:
+                if isinstance(value, str) and len(value) < 100:
+                    parts.append(f"{key}: {value}")
+
+        return ". ".join(parts) + "."
+
     def add_relationship(self, source_id: str, target_id: str,
                         relationship_type: str, properties: Dict[str, Any] = None):
         """
