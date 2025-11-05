@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph RAG Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔗 Graph RAG Dashboard</h1>
+            <p>Interactive Knowledge Graph Retrieval-Augmented Generation System</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="section">
+                    <h2>Graphs</h2>
+                    <button class="btn btn-primary" onclick="showCreateGraphModal()">+ New Graph</button>
+                    <div id="graphsList" class="graphs-list"></div>
+                </div>
+
+                <div class="section">
+                    <h2>Actions</h2>
+                    <button class="btn btn-secondary" onclick="showAddDataModal()">Add Data</button>
+                    <button class="btn btn-secondary" onclick="showQueryModal()">Query Graph</button>
+                    <button class="btn btn-secondary" onclick="showAddEntityModal()">Add Entity</button>
+                    <button class="btn btn-secondary" onclick="showAddRelationshipModal()">Add Relationship</button>
+                </div>
+
+                <div class="section" id="graphStats">
+                    <h2>Statistics</h2>
+                    <div id="statsContent">
+                        <p class="text-muted">Select a graph to view statistics</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main content area -->
+            <main class="content">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('visualization')">Visualization</button>
+                    <button class="tab-btn" onclick="switchTab('query')">Query Results</button>
+                    <button class="tab-btn" onclick="switchTab('data')">Data Explorer</button>
+                </div>
+
+                <div id="visualization" class="tab-content active">
+                    <div id="graphVisualization" class="graph-container"></div>
+                    <div class="graph-info">
+                        <p id="noGraphMessage" class="text-muted">Create or select a graph to visualize</p>
+                    </div>
+                </div>
+
+                <div id="query" class="tab-content">
+                    <div class="query-interface">
+                        <h3>Query Results</h3>
+                        <div id="queryResults">
+                            <p class="text-muted">Run a query to see results here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="data" class="tab-content">
+                    <div class="data-explorer">
+                        <h3>Entities</h3>
+                        <div id="entitiesList" class="data-list">
+                            <p class="text-muted">Select a graph to view entities</p>
+                        </div>
+
+                        <h3>Relationships</h3>
+                        <div id="relationshipsList" class="data-list">
+                            <p class="text-muted">Select a graph to view relationships</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="createGraphModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('createGraphModal')">&times;</span>
+            <h2>Create New Graph</h2>
+            <form id="createGraphForm" onsubmit="createGraph(event)">
+                <div class="form-group">
+                    <label for="graphName">Graph Name:</label>
+                    <input type="text" id="graphName" name="graphName" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="addDataModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addDataModal')">&times;</span>
+            <h2>Add Data to Graph</h2>
+            <form id="addDataForm" onsubmit="addData(event)">
+                <div class="form-group">
+                    <label for="dataType">Data Type:</label>
+                    <select id="dataType" name="dataType" onchange="toggleDataInput()">
+                        <option value="text">Text/Document</option>
+                        <option value="json">JSON Data</option>
+                    </select>
+                </div>
+                <div class="form-group" id="textInput">
+                    <label for="documentText">Text:</label>
+                    <textarea id="documentText" name="documentText" rows="6"></textarea>
+                </div>
+                <div class="form-group" id="jsonInput" style="display:none;">
+                    <label for="jsonData">JSON Data:</label>
+                    <textarea id="jsonData" name="jsonData" rows="6"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Data</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="queryModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('queryModal')">&times;</span>
+            <h2>Query Graph</h2>
+            <form id="queryForm" onsubmit="queryGraph(event)">
+                <div class="form-group">
+                    <label for="queryText">Query:</label>
+                    <input type="text" id="queryText" name="queryText" required placeholder="e.g., Tell me about John">
+                </div>
+                <div class="form-group">
+                    <label for="maxResults">Max Results:</label>
+                    <input type="number" id="maxResults" name="maxResults" value="10" min="1">
+                </div>
+                <button type="submit" class="btn btn-primary">Query</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="addEntityModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addEntityModal')">&times;</span>
+            <h2>Add Entity</h2>
+            <form id="addEntityForm" onsubmit="addEntity(event)">
+                <div class="form-group">
+                    <label for="entityId">Entity ID:</label>
+                    <input type="text" id="entityId" name="entityId" required>
+                </div>
+                <div class="form-group">
+                    <label for="entityType">Entity Type:</label>
+                    <input type="text" id="entityType" name="entityType" placeholder="e.g., PERSON, ORGANIZATION">
+                </div>
+                <div class="form-group">
+                    <label for="entityProperties">Properties (JSON):</label>
+                    <textarea id="entityProperties" name="entityProperties" rows="4" placeholder='{"name": "John Doe", "age": 30}'></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Entity</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="addRelationshipModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addRelationshipModal')">&times;</span>
+            <h2>Add Relationship</h2>
+            <form id="addRelationshipForm" onsubmit="addRelationship(event)">
+                <div class="form-group">
+                    <label for="relSource">Source Entity ID:</label>
+                    <input type="text" id="relSource" name="relSource" required>
+                </div>
+                <div class="form-group">
+                    <label for="relTarget">Target Entity ID:</label>
+                    <input type="text" id="relTarget" name="relTarget" required>
+                </div>
+                <div class="form-group">
+                    <label for="relType">Relationship Type:</label>
+                    <input type="text" id="relType" name="relType" required placeholder="e.g., WORKS_AT, KNOWS">
+                </div>
+                <div class="form-group">
+                    <label for="relProperties">Properties (JSON):</label>
+                    <textarea id="relProperties" name="relProperties" rows="4" placeholder='{"since": "2020"}'></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Relationship</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
