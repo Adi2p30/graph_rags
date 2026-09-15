@@ -56,3 +56,23 @@ SPARSE_WEIGHT = float(os.getenv("SPARSE_WEIGHT", "0.4"))
 # the tens-of-minutes range rather than hours. Raise via env if you have time
 # (or a faster model) to spare.
 CONNECTION_FINDER_MAX_PAIRS = int(os.getenv("CONNECTION_FINDER_MAX_PAIRS", "12"))
+
+# --- Code ingestion (ingestion/code_chunker.py, graph_ops/code_pipeline.py) ---
+CODE_SUPPORTED_EXTENSIONS = os.getenv("CODE_SUPPORTED_EXTENSIONS", ".py").split(",")
+CODE_EXCLUDE_DIRS = set(
+    os.getenv(
+        "CODE_EXCLUDE_DIRS",
+        ".git,.venv,venv,__pycache__,node_modules,.mypy_cache,.pytest_cache,build,dist,.tox",
+    ).split(",")
+)
+# Hard cap on a single symbol's stored source text (chars) -- keeps a giant
+# generated function from blowing up Neo4j/Qdrant payload size. The symbol
+# itself is never split (a function is the atomic semantic unit); only its
+# stored text is truncated past this.
+CODE_CHUNK_MAX_BODY_CHARS = int(os.getenv("CODE_CHUNK_MAX_BODY_CHARS", "4000"))
+# Loose (not-in-any-def) top-level statements -- module docstring, constants,
+# script bodies -- are packed into "module" symbol(s) up to this line budget,
+# same spirit as CHUNK_TARGET_WORDS for prose.
+CODE_MODULE_CHUNK_MAX_LINES = int(os.getenv("CODE_MODULE_CHUNK_MAX_LINES", "60"))
+# Skip files bigger than this so a vendored/minified/data file can't stall ingest.
+CODE_MAX_FILE_BYTES = int(os.getenv("CODE_MAX_FILE_BYTES", "512_000"))

@@ -14,7 +14,8 @@ is the only code that's allowed to write to both, and it always does so together
 ## Architecture
 
 ```
-ingestion/        Gutenberg search + download, boilerplate stripping, structure-aware chunking
+ingestion/        Gutenberg search + download, boilerplate stripping, structure-aware chunking,
+                    code_chunker.py (tree-sitter semantic chunking for source files)
 graphbuild/        node_schema.py (the shared Node/Edge dataclasses), embeddings (sentence-transformers),
                     sparse (TF-IDF), similarity (hybrid cosine -> candidate edges)
 llm/                provider abstraction (Ollama local / Gemini cloud), connection_finder (LLM #1:
@@ -22,16 +23,52 @@ llm/                provider abstraction (Ollama local / Gemini cloud), connecti
                     hybrid retrieval + graph traversal + grounded answer)
 store/              neo4j_store.py, qdrant_store.py -- the only modules that touch the DB drivers
 graph_ops/          node_ops (create/merge, dual-store), edge_ops (manual + AI relationship creation),
-                    pipeline.py (full ingest orchestration)
+                    pipeline.py (book ingest orchestration), code_pipeline.py (code ingest orchestration)
 app/                Flask GUI (dashboard, node browser/detail, visual graph explorer, GraphRAG query
                     page, AI tools, ingest trigger) -- this *is* the frontend, no separate SPA
 ```
 
 ### Node/edge schema (`graphbuild/node_schema.py`)
 
-Four node types: `Book`, `Section`, `Chunk`, `Concept`. Every node carries `topic`, `created_by`,
-`created_at`, and a free-form `metadata` dict. Concepts are synthesized by the LLM connection-finder
-(or manually via the GUI) to tie together chunks that instantiate the same recurring idea.
+Six node types: `Book`, `Section`, `Chunk`, `Concept`, `CodeFile`, and the code-graph's semantic unit
+(module/class/function/method), which is stamped `NodeType.CHUNK` rather than a type of its own so it
+rides every existing Chunk code path for free -- the fulltext index, the connection-finder pass, Qdrant's
+`type == "Chunk"` retrieval filter -- while carrying its own dataclass (`CodeSymbolNode`) with
+code-specific fields (`kind`, `qualified_name`, `signature`, `calls_raw`, `complexity`, ...). Every node
+carries `topic`, `created_by`, `created_at`, and a free-form `metadata` dict. Concepts are synthesized by
+the LLM connection-finder (or manually via the GUI) to tie together chunks that instantiate the same
+recurring idea.
+
+### Code ingestion (`ingestion/code_chunker.py`, `graph_ops/code_pipeline.py`)
+
+Parallel to the book pipeline, for source code instead of prose:
+
+1. **Parse.** [tree-sitter](https://tree-sitter.github.io/tree-sitter/) parses each file into a concrete
+   syntax tree (Python only today; adding a language is a registry entry + a `LangSpec`, not new control
+   flow -- see the module docstring).
+2. **Structure-aware chunk.** The AST is walked to find semantic units -- module, class, function,
+   method -- instead of cutting at arbitrary line/token windows: `CodeFile -HAS_CHUNK-> symbol`,
+   nested `symbol -HAS_CHUNK-> symbol` (class -> method), `symbol -NEXT_CHUNK-> symbol` for definition
+   order. Loose top-level code (module docstring, constants, script bodies) is packed into a leading
+   "module" chunk the same way `ingestion/chunker.py` packs prose paragraphs.
+3. **Structured extraction beyond syntax.** Each symbol also gets a resolved qualified name, a rendered
+   signature, docstring, decorators, superclasses, a cyclomatic-complexity proxy (branch-node count), and
+   the raw callee expressions found in its body.
+4. **Whole-repo resolution pass.** `graph_ops/code_pipeline.py` builds a repo-wide symbol table from
+   every file's chunks and resolves those raw callees/superclasses/imports into typed edges --
+   `CALLS`, `INHERITS_FROM`, `IMPORTS` (`EdgeMethod.STATIC_ANALYSIS`) -- via `self`/`cls` resolution,
+   the file's import table, then a same-file/unique-global name fallback for bare identifiers. Deliberately
+   returns no edge rather than guessing when a match is ambiguous (e.g. a dotted call through an
+   unresolvable receiver, like `some_local_var.get(...)`, isn't resolved by trailing-name alone -- that
+   produced false edges for common method names during testing).
+5. **Embed.** Retrieval embeds a structured natural-language "card" (qualified name, signature,
+   docstring, callees) followed by the source, not raw code -- `all-MiniLM-L6-v2` truncates at 256
+   tokens and wasn't trained heavily on code, and the card also gets identifier-split tokens
+   (`get_driver` -> `get`, `driver`) appended for TF-IDF. The TF-IDF vectorizer is a corpus-wide shared
+   resource (see below); code ingestion extends the existing one via `transform()` if a books index is
+   already on disk, and only fits+saves a new one on a from-scratch run.
+
+Run it with `python scripts/run_code_ingest.py <path-to-repo>` (e.g. `.` to ingest this repo itself).
 
 Edges carry `rel_type`, `method` (`structural` / `hybrid_similarity` / `llm_connection_finder` /
 `manual`), a `weight` (similarity score or LLM confidence), and an `explanation` string the GUI

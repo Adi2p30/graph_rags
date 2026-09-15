@@ -27,15 +27,20 @@ class NodeType(str, Enum):
     SECTION = "Section"
     CHUNK = "Chunk"
     CONCEPT = "Concept"
+    CODE_FILE = "CodeFile"
 
 
 class RelationType(str, Enum):
-    # structural (derived straight from document layout)
+    # structural (derived straight from document/file layout)
     HAS_SECTION = "HAS_SECTION"          # Book -> Section, Section -> Section (nesting)
-    HAS_CHUNK = "HAS_CHUNK"              # Section -> Chunk
-    NEXT_CHUNK = "NEXT_CHUNK"            # Chunk -> Chunk (reading order)
+    HAS_CHUNK = "HAS_CHUNK"              # Section -> Chunk; also CodeFile -> symbol, symbol -> nested symbol
+    NEXT_CHUNK = "NEXT_CHUNK"            # Chunk -> Chunk (reading order / definition order)
     # similarity-derived (sparse/dense hybrid score, no LLM involved)
     SIMILAR_TO = "SIMILAR_TO"            # Chunk -> Chunk, cross-book candidate edges
+    # static-analysis-derived (deterministic identifier/import resolution, no LLM)
+    CALLS = "CALLS"                      # function/method symbol -> function/method symbol
+    IMPORTS = "IMPORTS"                  # CodeFile -> CodeFile
+    INHERITS_FROM = "INHERITS_FROM"      # class symbol -> class symbol
     # LLM-derived (connection_finder judged these)
     RELATES_TO = "RELATES_TO"            # generic typed semantic relation between chunks/concepts
     SUPPORTS = "SUPPORTS"
@@ -48,6 +53,7 @@ class RelationType(str, Enum):
 
 class EdgeMethod(str, Enum):
     STRUCTURAL = "structural"
+    STATIC_ANALYSIS = "static_analysis"  # deterministic code analysis (calls/imports/inheritance resolution)
     HYBRID_SIMILARITY = "hybrid_similarity"
     LLM_CONNECTION_FINDER = "llm_connection_finder"
     MANUAL = "manual"
@@ -118,6 +124,60 @@ class ConceptNode(GraphNode):
 
     def __post_init__(self):
         self.type = NodeType.CONCEPT
+
+
+@dataclass
+class CodeFileNode(GraphNode):
+    """One per source file -- the code-graph analog of BookNode. Never embedded
+    into Qdrant itself (nothing to retrieve at file granularity); it's the
+    structural anchor that CodeSymbolNode chunks hang off of via HAS_CHUNK."""
+    repo: str = ""
+    path: str = ""                   # repo-relative path, e.g. "graph_ops/pipeline.py"
+    module_path: str = ""            # dotted import path, e.g. "graph_ops.pipeline"
+    language: str = ""
+    loc: int = 0
+    imports: list[str] = field(default_factory=list)   # raw "import x" / "from x import y" lines
+
+    def __post_init__(self):
+        self.type = NodeType.CODE_FILE
+
+
+@dataclass
+class CodeSymbolNode(GraphNode):
+    """A semantic code unit (module-level summary, class, function, or method).
+    Stamped with NodeType.CHUNK (not a new type) so it rides every existing
+    Chunk code path for free: the `chunk_text_ft` fulltext index, the
+    connection-finder pass's `node_type="Chunk"` pull, and Qdrant's
+    `type == "Chunk"` retrieval filter. All fields are Neo4j-safe scalars or
+    list[str] -- nothing nested (see graphbuild.node_schema module docstring
+    discipline); richer structure (per-param types, raw call sites) belongs in
+    the Qdrant payload, not here.
+    """
+    file_id: str = ""
+    parent_symbol_id: Optional[str] = None   # enclosing class symbol, for methods
+    kind: str = "function"                   # "module" | "class" | "function" | "method"
+    language: str = ""
+    name: str = ""
+    qualified_name: str = ""                 # dotted path, e.g. "graph_ops.pipeline.run_full_ingest"
+    signature: str = ""                      # rendered "(params) -> return_type", empty for module/class
+    docstring: str = ""
+    decorators: list[str] = field(default_factory=list)
+    base_classes: list[str] = field(default_factory=list)   # raw superclass names, kind == "class" only
+    calls_raw: list[str] = field(default_factory=list)      # raw callee expressions found in the body
+    start_line: int = 0
+    end_line: int = 0
+    complexity: int = 0                      # branch-count proxy, see code_chunker._branch_count
+    text: str = ""                           # source slice (may be truncated, see truncated flag)
+    truncated: bool = False
+    word_count: int = 0
+    order_index: int = 0
+    prev_chunk_id: Optional[str] = None
+    next_chunk_id: Optional[str] = None
+
+    def __post_init__(self):
+        self.type = NodeType.CHUNK
+        if self.text and not self.word_count:
+            self.word_count = len(self.text.split())
 
 
 @dataclass
