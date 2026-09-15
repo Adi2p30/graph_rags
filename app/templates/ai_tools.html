@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}AI Tools{% endblock %}
+{% block content %}
+<h1>AI Tools</h1>
+<p class="subtitle">Runs the connection-finder LLM over chunks already in the graph: recomputes
+hybrid dense+sparse similarity among them, judges the top candidate pairs, and writes typed
+relationships (and any new Concept nodes it proposes) into Neo4j + Qdrant.</p>
+
+<div id="ai-status"></div>
+
+<form method="post" action="{{ url_for('main.run_connection_finder') }}">
+  <div class="field">
+    <label>Scope</label>
+    <select name="topic">
+      <option value="">All topics</option>
+      {% for t in topics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="submit">Run connection-finder pass</button>
+</form>
+
+<script>
+async function pollAI() {
+  const res = await fetch("{{ url_for('main.ai_status') }}");
+  const data = await res.json();
+  const el = document.getElementById('ai-status');
+  if (data.running) {
+    el.innerHTML = '<div class="status-banner running">Running&hellip; the LLM is judging candidate pairs. This can take a minute or two.</div>';
+  } else if (data.error) {
+    el.innerHTML = '<div class="status-banner error">Error: <pre>' + data.error + '</pre></div>';
+  } else if (data.result) {
+    el.innerHTML = '<div class="status-banner">Last run: judged ' + data.result.pairs_judged +
+      ' pairs &rarr; created ' + data.result.edges_created + ' typed edges, ' +
+      data.result.concepts_created + ' new concepts.</div>';
+  }
+  setTimeout(pollAI, 3000);
+}
+pollAI();
+</script>
+{% endblock %}

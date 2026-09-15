@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GraphRAG{% endblock %} · Flight Systems Graph</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav class="topnav">
+    <a class="brand" href="{{ url_for('main.dashboard') }}">Flight Systems GraphRAG</a>
+    <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('main.browse_nodes') }}">Browse Nodes</a>
+    <a href="{{ url_for('main.graph_view') }}">Graph Explorer</a>
+    <a href="{{ url_for('main.query') }}">Ask (GraphRAG)</a>
+    <a href="{{ url_for('main.ai_tools') }}">AI Tools</a>
+    <a href="{{ url_for('main.ingest') }}">Ingest</a>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}New Node{% endblock %}
+{% block content %}
+<h1>Create a node</h1>
+<p class="subtitle">Manually add a Concept or a free-standing note-chunk to the graph.</p>
+<form method="post">
+  <div class="field">
+    <label>Kind</label>
+    <select name="kind">
+      <option value="concept">Concept</option>
+      <option value="chunk">Note / Chunk</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Label</label>
+    <input type="text" name="label" required>
+  </div>
+  <div class="field">
+    <label>Topic</label>
+    <select name="topic">
+      {% for t in topics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      <option value="">(none)</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Body (description / text)</label>
+    <textarea name="body" required></textarea>
+  </div>
+  <button type="submit">Create</button>
+</form>
+{% endblock %}

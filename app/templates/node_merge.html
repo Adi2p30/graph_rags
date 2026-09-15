@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Merge Nodes{% endblock %}
+{% block content %}
+<h1>Merge nodes</h1>
+<p class="subtitle">Pick one node to keep and one or more to absorb into it. Absorbed nodes'
+relationships are rewired onto the kept node, their text is folded in, and they are deleted
+from both Neo4j and Qdrant.</p>
+<form method="post" class="grid cols-2">
+  <div class="field">
+    <label>Keep this node</label>
+    <select name="keep_id" required>
+      {% for n in nodes %}
+      <option value="{{ n.id }}">[{{ n._labels[0] }}] {{ n.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Absorb these nodes (ctrl/cmd-click for multiple)</label>
+    <select name="absorb_ids" multiple required>
+      {% for n in nodes %}
+      <option value="{{ n.id }}">[{{ n._labels[0] }}] {{ n.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" style="grid-column: 1 / -1; width:fit-content;">Merge</button>
+</form>
+{% endblock %}

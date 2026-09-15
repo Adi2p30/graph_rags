@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Ask (GraphRAG){% endblock %}
+{% block content %}
+<h1>Ask a question</h1>
+<p class="subtitle">Hybrid-searches Qdrant for seed chunks/concepts, traverses the Neo4j graph
+around them, and asks the answer LLM to respond grounded in that context.</p>
+
+<form method="post">
+  <div class="field">
+    <label>Topic (optional, narrows retrieval)</label>
+    <select name="topic">
+      <option value="">All topics</option>
+      {% for t in topics %}<option value="{{ t }}" {{ 'selected' if t == topic }}>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Question</label>
+    <input type="text" name="query" value="{{ query_text }}" required autofocus>
+  </div>
+  <button type="submit">Ask</button>
+</form>
+
+{% if result %}
+<h2>Answer</h2>
+<div class="answer-box">{{ result.answer }}</div>
+
+<h2>Retrieved context ({{ result.context_preview | length }} nodes)</h2>
+{% for c in result.context_preview %}
+<div class="context-item">
+  <a href="{{ url_for('main.node_detail', node_id=c.node_id) }}"><code>{{ c.node_id }}</code></a>
+  &middot; {{ c.label }}
+  <div class="snippet">{{ c.snippet }}&hellip;</div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

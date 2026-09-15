@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}New Relationship{% endblock %}
+{% block content %}
+<h1>Create a relationship</h1>
+<form method="post" class="grid cols-2">
+  <div class="field">
+    <label>Source node</label>
+    <select name="source_id" required>
+      {% for n in nodes %}
+      <option value="{{ n.id }}" {{ 'selected' if n.id == source_id }}>[{{ n._labels[0] }}] {{ n.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Target node</label>
+    <select name="target_id" required>
+      {% for n in nodes %}
+      <option value="{{ n.id }}">[{{ n._labels[0] }}] {{ n.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Relationship type</label>
+    <select name="rel_type" required>
+      {% for t in rel_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Explanation (optional)</label>
+    <input type="text" name="explanation" placeholder="why these are related">
+  </div>
+  <button type="submit" style="grid-column: 1 / -1; width:fit-content;">Create relationship</button>
+</form>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Ingest{% endblock %}
+{% block content %}
+<h1>Ingest books &rarr; build graph</h1>
+<p class="subtitle">Fetches public-domain books from Project Gutenberg per topic, structure-aware
+chunks them, embeds (dense + TF-IDF sparse), writes Neo4j + Qdrant, then optionally runs the
+LLM connection-finder. Gutenberg's corpus is pre-1929, so some modern topics may come back with
+no hits &mdash; the run report tells you which.</p>
+
+<div id="ingest-status"></div>
+
+<form method="post" action="{{ url_for('main.ingest') }}">
+  <div class="field">
+    <label>Topics (none selected = all 13)</label>
+    <select name="topics" multiple>
+      {% for t in topics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Max books per topic</label>
+    <input type="number" name="max_books" value="1" min="1" max="5">
+  </div>
+  <div class="field">
+    <label><input type="checkbox" name="run_connection_finder" checked style="width:auto;"> Run LLM connection-finder after ingest</label>
+  </div>
+  <button type="submit">Start ingest</button>
+</form>
+
+<script>
+async function pollIngest() {
+  const res = await fetch("{{ url_for('main.ingest_status') }}");
+  const data = await res.json();
+  const el = document.getElementById('ingest-status');
+  if (data.running) {
+    el.innerHTML = '<div class="status-banner running">Ingest running&hellip; this can take several minutes (downloads + embeddings + LLM calls). Feel free to browse elsewhere; this banner updates automatically.</div>';
+  } else if (data.error) {
+    el.innerHTML = '<div class="status-banner error">Error: <pre>' + data.error + '</pre></div>';
+  } else if (data.report) {
+    let r = data.report;
+    let html = '<div class="status-banner">Done in ' + r.elapsed_seconds + 's: ' + r.total_chunks + ' chunks across ' + r.books.length + ' books.';
+    if (r.topics_with_no_hits.length) {
+      html += '<br><span class="warn">No Gutenberg hits for: ' + r.topics_with_no_hits.join(', ') + '</span>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+  setTimeout(pollIngest, 4000);
+}
+pollIngest();
+</script>
+{% endblock %}

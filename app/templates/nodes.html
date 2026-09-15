@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Browse Nodes{% endblock %}
+{% block content %}
+<h1>Browse Nodes</h1>
+<p class="subtitle"><a href="{{ url_for('main.new_node') }}">+ Create a node</a> &middot; <a href="{{ url_for('main.merge_nodes_view') }}">Merge nodes</a></p>
+
+<form method="get" class="grid cols-3" style="margin-bottom:20px;">
+  <div class="field">
+    <label>Type</label>
+    <select name="type" onchange="this.form.submit()">
+      <option value="">All types</option>
+      {% for t in node_types %}
+      <option value="{{ t }}" {{ 'selected' if t == selected_type }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Topic</label>
+    <select name="topic" onchange="this.form.submit()">
+      <option value="">All topics</option>
+      {% for t in topics %}
+      <option value="{{ t }}" {{ 'selected' if t == selected_topic }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label>Search text</label>
+    <input type="text" name="q" value="{{ search }}" placeholder="search label / text...">
+  </div>
+  <button type="submit" style="grid-column: 1 / -1; width:fit-content;">Filter</button>
+</form>
+
+<table>
+  <tr><th>Type</th><th>Label</th><th>Topic</th><th>Created by</th></tr>
+  {% for n in nodes %}
+  <tr>
+    <td><span class="badge badge-{{ n._labels[0] }}">{{ n._labels[0] }}</span></td>
+    <td><a href="{{ url_for('main.node_detail', node_id=n.id) }}">{{ n.label }}</a></td>
+    <td class="muted">{{ n.topic }}</td>
+    <td class="muted">{{ n.created_by }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">No nodes match these filters.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

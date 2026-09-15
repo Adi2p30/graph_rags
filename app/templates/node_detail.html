@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ node.label }}{% endblock %}
+{% block content %}
+<span class="badge badge-{{ node._labels[0] }}">{{ node._labels[0] }}</span>
+<h1>{{ node.label }}</h1>
+<p class="subtitle">id: <code>{{ node.id }}</code> &middot; topic: {{ node.topic }} &middot; created by: {{ node.created_by }}</p>
+
+<div class="grid cols-2">
+  <div>
+    <h3>Content</h3>
+    <div class="chunk-text">{{ node.text or node.description or '(no body text)' }}</div>
+
+    <h3>Metadata</h3>
+    <table>
+      {% for k, v in node.items() %}
+        {% if k not in ['id','label','text','description','_labels','created_by','topic'] %}
+        <tr><td class="muted">{{ k }}</td><td>{{ v }}</td></tr>
+        {% endif %}
+      {% endfor %}
+    </table>
+
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <a class="btn secondary" href="{{ url_for('main.new_relationship', source_id=node.id) }}">+ Relationship from here</a>
+      <a class="btn secondary" href="{{ url_for('main.merge_nodes_view') }}">Merge&hellip;</a>
+      <form class="inline" method="post" action="{{ url_for('main.delete_node', node_id=node.id) }}" onsubmit="return confirm('Delete this node and its relationships?');">
+        <button type="submit" class="danger">Delete node</button>
+      </form>
+    </div>
+  </div>
+
+  <div>
+    <h3>Relationships ({{ relationships | length }})</h3>
+    {% for rel in relationships %}
+    <div class="rel-row">
+      <div class="rel-arrow">
+        {{ ('&#8594;' if rel.outgoing else '&#8592;') | safe }}
+        <span class="badge badge-method-{{ rel.edge.method }}">{{ rel.edge.rel_type }}</span>
+      </div>
+      <div>
+        <a href="{{ url_for('main.node_detail', node_id=rel.neighbor.id) }}">{{ rel.neighbor.label }}</a>
+        <span class="badge badge-{{ rel.neighbor._labels[0] }}">{{ rel.neighbor._labels[0] }}</span>
+        {% if rel.edge.explanation %}
+        <div class="rel-explain">{{ rel.edge.explanation }} (weight {{ '%.2f' % rel.edge.weight }})</div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No relationships yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

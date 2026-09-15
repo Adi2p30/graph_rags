@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Graph Explorer{% endblock %}
+{% block content %}
+<h1>Graph Explorer</h1>
+<p class="subtitle">Click a node to open its detail page. Drag to rearrange, scroll to zoom.</p>
+
+<div class="pill-row" id="topic-filter">
+  <span class="pill active" data-topic="">All topics</span>
+  {% for t in topics %}
+  <span class="pill" data-topic="{{ t }}">{{ t }}</span>
+  {% endfor %}
+</div>
+
+<div id="network"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+<script>
+const groupColors = {
+  Book: '#5b8cff', Section: '#b48bff', Chunk: '#5fc7de', Concept: '#f0c96a',
+};
+const container = document.getElementById('network');
+let network = null;
+
+async function loadGraph(topic) {
+  const url = new URL("{{ url_for('main.api_subgraph') }}", window.location.origin);
+  if (topic) url.searchParams.set('topic', topic);
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const nodes = new vis.DataSet(data.nodes.map(n => ({
+    id: n.id, label: n.label, title: n.title,
+    color: groupColors[n.group] || '#8b93a3',
+  })));
+  const edges = new vis.DataSet(data.edges.map(e => ({
+    id: e.id, from: e.from, to: e.to, label: e.label, arrows: 'to',
+    font: { size: 9, color: '#8b93a3', strokeWidth: 0 },
+    color: { color: '#2a2f3a', highlight: '#5b8cff' },
+  })));
+
+  const options = {
+    physics: { stabilization: true, barnesHut: { gravitationalConstant: -4000, springLength: 120 } },
+    nodes: { shape: 'dot', size: 10, font: { color: '#e6e8ec', size: 11 } },
+    interaction: { hover: true },
+  };
+
+  if (network) network.destroy();
+  network = new vis.Network(container, { nodes, edges }, options);
+  network.on('click', function (params) {
+    if (params.nodes.length) {
+      window.location.href = "/nodes/" + params.nodes[0];
+    }
+  });
+}
+
+document.querySelectorAll('#topic-filter .pill').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('#topic-filter .pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    loadGraph(el.dataset.topic);
+  });
+});
+
+loadGraph('');
+</script>
+{% endblock %}

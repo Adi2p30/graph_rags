@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Graph Dashboard</h1>
+<p class="subtitle">Neo4j structure + Qdrant hybrid retrieval over flight-systems texts.</p>
+
+{% if ingest_state.running %}
+<div class="status-banner running">Ingestion is running in the background&hellip; <a href="{{ url_for('main.ingest') }}">view status</a></div>
+{% endif %}
+
+<div class="grid cols-3">
+  <div class="card">
+    <div class="stat-label">Books</div>
+    <div class="stat">{{ stats.nodes.get('Book', 0) }}</div>
+  </div>
+  <div class="card">
+    <div class="stat-label">Sections</div>
+    <div class="stat">{{ stats.nodes.get('Section', 0) }}</div>
+  </div>
+  <div class="card">
+    <div class="stat-label">Chunks</div>
+    <div class="stat">{{ stats.nodes.get('Chunk', 0) }}</div>
+  </div>
+  <div class="card">
+    <div class="stat-label">Concepts</div>
+    <div class="stat">{{ stats.nodes.get('Concept', 0) }}</div>
+  </div>
+  <div class="card">
+    <div class="stat-label">Relationships</div>
+    <div class="stat">{{ stats.relationships.values() | sum }}</div>
+  </div>
+  <div class="card">
+    <div class="stat-label">Qdrant points</div>
+    <div class="stat">{{ qstats.points_count }}</div>
+  </div>
+</div>
+
+<h2>Relationship types</h2>
+<table>
+  <tr><th>Type</th><th>Count</th></tr>
+  {% for t, c in stats.relationships.items() %}
+  <tr><td><span class="badge badge-method-{{ 'structural' if t in ['HAS_SECTION','HAS_CHUNK','NEXT_CHUNK'] else ('manual' if t=='MANUAL' else 'llm_connection_finder') }}">{{ t }}</span></td><td>{{ c }}</td></tr>
+  {% else %}
+  <tr><td colspan="2" class="muted">No relationships yet &mdash; run an ingest first.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Topics</h2>
+<div class="pill-row">
+  {% for t in topics %}
+  <a class="pill" href="{{ url_for('main.browse_nodes', topic=t) }}">{{ t }}</a>
+  {% endfor %}
+</div>
+
+<h2>Next steps</h2>
+<ul>
+  <li>No data yet? Go to <a href="{{ url_for('main.ingest') }}">Ingest</a> to pull Gutenberg books per topic and build the graph.</li>
+  <li>Explore what's there: <a href="{{ url_for('main.browse_nodes') }}">Browse Nodes</a> or the visual <a href="{{ url_for('main.graph_view') }}">Graph Explorer</a>.</li>
+  <li>Ask a question grounded in the graph: <a href="{{ url_for('main.query') }}">Ask (GraphRAG)</a>.</li>
+  <li>Let the AI propose new relationships/concepts on existing chunks: <a href="{{ url_for('main.ai_tools') }}">AI Tools</a>.</li>
+</ul>
+{% endblock %}
